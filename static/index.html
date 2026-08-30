@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>voice-postgres · Harbor &amp; Bean</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <div>
+            <h1>voice-postgres</h1>
+            <p>Talk to Harbor &amp; Bean’s local Postgres over xAI Speech to Speech.</p>
+          </div>
+        </div>
+        <dl class="status" id="status">
+          <div><dt>Postgres</dt><dd id="db-status">checking</dd></div>
+          <div><dt>xAI key</dt><dd id="key-status">checking</dd></div>
+          <div><dt>Voice</dt><dd id="voice-status">—</dd></div>
+        </dl>
+      </header>
+
+      <main class="grid">
+        <section class="panel schema-panel">
+          <header class="panel-head">
+            <h2>Database</h2>
+            <button type="button" class="text-btn" id="refresh-schema">Refresh</button>
+          </header>
+          <p class="hint">Harbor &amp; Bean cafe ops. Click a relation to preview rows.</p>
+          <ul class="schema-list" id="schema-list"></ul>
+          <div class="preview" id="preview" hidden>
+            <h3 id="preview-title"></h3>
+            <div class="table-wrap" id="preview-table"></div>
+          </div>
+        </section>
+
+        <section class="panel talk-panel">
+          <button type="button" class="orb" id="talk-btn" aria-pressed="false">
+            <span class="orb-ring"></span>
+            <span class="orb-core" id="orb-core">Talk</span>
+          </button>
+          <p class="talk-caption" id="talk-caption">Click Talk, allow the microphone, then ask about the shop.</p>
+          <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
+          <div class="chips" id="chips">
+            <button type="button">What’s low in stock?</button>
+            <button type="button">Who’s on shift today?</button>
+            <button type="button">Top customer this month?</button>
+            <button type="button">What tickets are still open?</button>
+          </div>
+        </section>
+
+        <section class="panel transcript-panel">
+          <header class="panel-head"><h2>Transcript</h2></header>
+          <ol class="transcript" id="transcript"></ol>
+        </section>
+
+        <section class="panel tools-panel">
+          <header class="panel-head"><h2>Tool calls</h2></header>
+          <ol class="tools" id="tools"></ol>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
