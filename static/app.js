@@ -77,6 +77,10 @@ const els = {
   levelBar: document.getElementById("level-bar"),
   transcript: document.getElementById("transcript"),
   tools: document.getElementById("tools"),
+  phases: document.getElementById("phases"),
+  askForm: document.getElementById("ask-form"),
+  askInput: document.getElementById("ask-input"),
+  askSend: document.getElementById("ask-send"),
 };
 
 let live = {
@@ -92,6 +96,43 @@ let live = {
 
 function setCaption(text) {
   els.talkCaption.textContent = text;
+}
+
+function setPhase(phase) {
+  for (const li of els.phases.querySelectorAll("li")) {
+    li.classList.toggle("on", li.dataset.phase === phase);
+  }
+}
+
+function setAskEnabled(on) {
+  els.askInput.disabled = !on;
+  els.askSend.disabled = !on;
+}
+
+function sendText(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return;
+  if (!live.ws || live.ws.readyState !== WebSocket.OPEN) {
+    els.askInput.value = trimmed;
+    setCaption("Click Talk first so the Voice Agent session is open, then Ask.");
+    return;
+  }
+  live.ws.send(
+    JSON.stringify({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: trimmed }],
+      },
+    })
+  );
+  live.ws.send(JSON.stringify({ type: "response.create" }));
+  live.currentUser = addBubble("user", trimmed);
+  live.currentAssistant = null;
+  els.askInput.value = "";
+  setPhase("tool");
+  setCaption("Sent as text on the same realtime session. Waiting for Grok…");
 }
 
 function addBubble(role, text) {
@@ -259,18 +300,27 @@ function handleEvent(event) {
   const type = event.type;
   if (type === "error") {
     setCaption(event.error?.message || "Voice session error");
+    setPhase("idle");
     return;
   }
   if (type === "local.ready") {
-    setCaption(`Connected · ${event.voice} · ${event.sample_rate} Hz. Just talk.`);
+    setCaption(
+      `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice}. Speak naturally — pause briefly when you are done. Or type below.`
+    );
+    setPhase("mic");
+    setAskEnabled(true);
+    els.askInput.focus();
     return;
   }
   if (type === "local.tool_call") {
     addTool(event);
+    setPhase("tool");
+    setCaption(`Running ${event.name} against Postgres…`);
     return;
   }
   if (type === "response.output_audio.delta" || type === "response.audio.delta") {
     live.player?.play(event.delta);
+    setPhase("speak");
     return;
   }
   if (type === "response.output_audio_transcript.delta") {
@@ -279,12 +329,20 @@ function handleEvent(event) {
   }
   if (type === "response.done") {
     live.currentAssistant = null;
+    setPhase("mic");
+    setCaption("Listening. Speak, or type a follow-up.");
     return;
   }
   if (type === "input_audio_buffer.speech_started") {
     live.player?.stop();
     live.currentAssistant = null;
     live.currentUser = addBubble("user", "…");
+    setPhase("speech");
+    setCaption("Hearing you… keep talking, then pause.");
+    return;
+  }
+  if (type === "input_audio_buffer.speech_stopped") {
+    setCaption("Turn ended (silence). Grok is answering…");
     return;
   }
   if (type === "conversation.item.added" || type === "conversation.item.created") {
@@ -319,7 +377,8 @@ async function startSession() {
     live.capturing = true;
     els.talkBtn.setAttribute("aria-pressed", "true");
     els.orbCore.textContent = "Live";
-    setCaption("Listening…");
+    setPhase("mic");
+    setCaption("Opening the Voice Agent session… allow the mic if the browser asks.");
   };
   ws.onmessage = (msg) => {
     let event;
@@ -332,7 +391,9 @@ async function startSession() {
   };
   ws.onerror = () => setCaption("WebSocket error");
   ws.onclose = () => {
-    if (live.capturing) stopTalk();
+    if (els.talkBtn.getAttribute("aria-pressed") === "true" || live.processor) {
+      stopTalk();
+    }
   };
 }
 
@@ -340,12 +401,29 @@ function stopTalk() {
   stopMic();
   els.talkBtn.setAttribute("aria-pressed", "false");
   els.orbCore.textContent = "Talk";
-  setCaption("Session ended. Click Talk to start again.");
+  setAskEnabled(false);
+  setPhase("idle");
+  setCaption("Session ended. Click Talk to open the mic again.");
 }
 
 els.talkBtn.addEventListener("click", () => {
   if (els.talkBtn.getAttribute("aria-pressed") === "true") stopTalk();
-  else startSession().catch((err) => setCaption(err.message || String(err)));
+  else
+    startSession().catch((err) => {
+      stopTalk();
+      setCaption(err.message || String(err));
+    });
+});
+
+els.askForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  sendText(els.askInput.value);
+});
+
+document.getElementById("chips").addEventListener("click", (event) => {
+  const btn = event.target.closest("button");
+  if (!btn) return;
+  sendText(btn.textContent);
 });
 
 document.getElementById("refresh-schema").addEventListener("click", () => {

@@ -147,7 +147,37 @@ th { color: var(--muted); font-weight: 500; }
   0% { transform: scale(1); opacity: 1; }
   100% { transform: scale(1.12); opacity: 0.15; }
 }
+.phases {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem;
+  margin: 0 0 0.9rem; padding: 0; justify-content: center;
+}
+.phases li {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 0.18rem 0.55rem;
+}
+.phases li.on { color: var(--ink); border-color: var(--copper); background: #322018; }
+.phases li.on[data-phase="speech"] { border-color: var(--sage); background: #1e2a1c; }
+.phases li.on[data-phase="tool"] { border-color: #c4a026; background: #2a2414; }
+.phases li.on[data-phase="speak"] { border-color: var(--sage); background: #1e2a1c; }
+
 .talk-caption { color: var(--muted); max-width: 28rem; margin: 0.9rem 0 0.4rem; font-size: 0.92rem; }
+
+.ask {
+  display: flex; gap: 0.4rem; width: min(100%, 28rem); margin: 0.35rem 0 0.7rem;
+}
+.ask input {
+  flex: 1; min-width: 0;
+  background: #1a120e; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.45rem 0.65rem; font-family: var(--sans); font-size: 0.9rem;
+}
+.ask input:focus { outline: 1px solid var(--copper); }
+.ask button {
+  background: var(--copper); color: #1c1410; border: 0; border-radius: 8px;
+  padding: 0.45rem 0.8rem; font-family: var(--sans); font-weight: 600; cursor: pointer;
+}
+.ask button:disabled, .ask input:disabled { opacity: 0.45; cursor: not-allowed; }
 .level {
   width: 180px; height: 4px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 0.4rem 0 0.8rem;
 }

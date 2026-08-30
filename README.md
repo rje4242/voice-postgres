@@ -47,6 +47,47 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765), click **Talk**, allow the m
 
 `start.sh` brings up Postgres on **localhost:55432** (so it does not collide with a local server on 5432), waits until it is ready, installs the Python package, and serves the app.
 
+## How voice input works
+
+You do **not** press a push-to-talk button for each sentence. After **Talk**, the mic stays open. xAI’s **server VAD** (voice activity detection) decides when a turn starts and ends.
+
+```
+You speak
+   │
+   ▼
+Browser microphone  ──getUserMedia──►  AudioContext (~24 kHz, mono)
+   │
+   │  ScriptProcessor (~100 ms chunks)
+   │  float32  →  PCM16 little-endian  →  base64
+   ▼
+WebSocket /ws
+   {"type": "input_audio_buffer.append", "audio": "<base64 pcm>"}
+   │
+   ▼
+FastAPI  ──forwards JSON unchanged──►  wss://api.x.ai/v1/realtime
+                                         model=grok-voice-latest
+   │
+   ├─ input_audio_buffer.speech_started   you started talking (barge-in: playback stops)
+   ├─ input_audio_buffer.speech_stopped   ~600 ms of silence → end of your turn
+   ├─ response.function_call_arguments.done
+   │       FastAPI runs inspect_schema / query_database / create_order / …
+   │       against local Postgres, then sends function_call_output
+   ├─ response.output_audio.delta         PCM16 chunks played immediately
+   └─ response.output_audio_transcript.delta   shown in the transcript
+```
+
+Details that matter in practice:
+
+1. **Click Talk** → the page calls `getUserMedia({ audio: true })`. Chrome/Edge will prompt once for microphone permission on `http://127.0.0.1`.
+2. **Capture** uses the Web Audio API. We request 24 kHz PCM (the Speech to Speech default). If the browser’s context is a different native rate, that rate is sent in `local.start` so `session.update` matches.
+3. **Streaming is continuous.** Every processor callback becomes `input_audio_buffer.append`. There is no `commit` from the browser because `turn_detection.type` is `server_vad`.
+4. **Silence ends the turn.** `silence_duration_ms` is 600: pause that long and Grok treats it as “you’re done,” then answers. Speak again while it is talking to interrupt (barge-in).
+5. **The model hears audio, not a transcript first.** Speech-to-speech is one model: your waveform in, its waveform out. The transcript you see is a side channel for the UI.
+6. **Tools are not in the browser.** When Grok wants SQL or a ticket update, xAI sends `response.function_call_arguments.done`. The Python server runs the function on Postgres and returns `function_call_output`. Only then does it send `response.create` so Grok can speak the result.
+7. **Typing uses the same session.** After Talk is live, the text box (or a prompt chip) sends `conversation.item.create` with `input_text` plus `response.create`. Handy if you have no mic, or to debug a question.
+
+You still need `XAI_API_KEY` in `.env` for Talk to connect. The schema browser on the left works without it.
+
 Manual equivalent:
 
 ```bash

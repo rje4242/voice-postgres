@@ -44,12 +44,26 @@
         </section>
 
         <section class="panel talk-panel">
+          <ol class="phases" id="phases" aria-label="Voice session stages">
+            <li data-phase="idle" class="on">Idle</li>
+            <li data-phase="mic">Mic live</li>
+            <li data-phase="speech">You're speaking</li>
+            <li data-phase="tool">Postgres</li>
+            <li data-phase="speak">Agent speaking</li>
+          </ol>
           <button type="button" class="orb" id="talk-btn" aria-pressed="false">
             <span class="orb-ring"></span>
             <span class="orb-core" id="orb-core">Talk</span>
           </button>
-          <p class="talk-caption" id="talk-caption">Click Talk, allow the microphone, then ask about the shop.</p>
+          <p class="talk-caption" id="talk-caption">
+            Click Talk, allow the microphone, then just speak. The browser streams PCM to xAI;
+            xAI’s server VAD decides when you’ve finished a turn. You can also type once the session is live.
+          </p>
           <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
+          <form class="ask" id="ask-form">
+            <input id="ask-input" type="text" autocomplete="off" placeholder="Type a question after Talk is live…" disabled />
+            <button type="submit" id="ask-send" disabled>Ask</button>
+          </form>
           <div class="chips" id="chips">
             <button type="button">What’s low in stock?</button>
             <button type="button">Who’s on shift today?</button>
