@@ -20,6 +20,7 @@ The API key never leaves the server. Custom tools are executed next to the datab
 - Read-only `query_database` (SELECT / WITH only, timeout + row cap)
 - Write tools for tickets, customers, and inventory
 - A small web UI: schema browser, live transcript, tool-call inspector
+- A companion SQL console (`scripts/db_console.py`) for talking to the same Postgres directly
 
 The seed shop is **Harbor & Bean**, a neighborhood cafe: customers, products, tickets, staff, and shifts.
 
@@ -128,6 +129,39 @@ Connect with any client:
 
 ```text
 postgresql://voice:voice@127.0.0.1:55432/voice_postgres
+```
+
+### Companion SQL console
+
+Same database the voice agent uses. From the repo (venv activated, or `pip install -e .`):
+
+```bash
+python scripts/db_console.py
+# or
+python -m voice_postgres.console
+# or
+make db
+```
+
+You’ll get a `voice=>` prompt. SQL must end with `;`. Meta commands:
+
+| Command | What it does |
+|---|---|
+| `\tables` | List tables |
+| `\views` | List views |
+| `\d products` | Columns for a table or view |
+| `\preview orders` | First 20 rows |
+| `\low` / `\open` / `\shift` / `\sales` | Stock, open tickets, today’s shifts, daily sales |
+| `\counts` | Approx row counts |
+| `\q` | Quit |
+
+One-shot (no REPL):
+
+```bash
+python scripts/db_console.py --tables
+python scripts/db_console.py --preview products
+python scripts/db_console.py -c "SELECT * FROM v_low_stock"
+python scripts/db_console.py open
 ```
 
 Schema is applied on first `docker compose up` **and** again (idempotently) when the app starts.

@@ -23,6 +23,7 @@ dev = [
 
 [project.scripts]
 voice-postgres = "voice_postgres.server:main"
+voice-pg = "voice_postgres.console:main"
 
 [build-system]
 requires = ["hatchling"]
