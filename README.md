@@ -133,14 +133,22 @@ postgresql://voice:voice@127.0.0.1:55432/voice_postgres
 
 ### Companion SQL console
 
-Same database the voice agent uses. From the repo (venv activated, or `pip install -e .`):
+Same database the voice agent uses. From a **new zsh**:
+
+```zsh
+cd /path/to/voice-postgres
+source ./env.sh
+python scripts/db_console.py
+```
+
+`env.sh` starts Docker Postgres, creates/activates `.venv`, loads `.env` (`DATABASE_URL`), and puts the venv on `PATH`. Source it so the variables stay in that shell. If you run `./env.sh` instead, it does the same setup and then opens a configured interactive zsh.
+
+Also:
 
 ```bash
-python scripts/db_console.py
-# or
 python -m voice_postgres.console
-# or
 make db
+voice-pg
 ```
 
 You’ll get a `voice=>` prompt. SQL must end with `;`. Meta commands:

@@ -12,5 +12,8 @@ run: up
 db:
 	python -m voice_postgres.console
 
+env:
+	@echo "From zsh:  source ./env.sh"
+
 test:
 	python -m pytest -q
