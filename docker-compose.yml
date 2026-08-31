@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: voice
       POSTGRES_DB: voice_postgres
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - voice_pgdata:/var/lib/postgresql/data
       - ./sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro

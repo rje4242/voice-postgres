@@ -1,0 +1,24 @@
+[Unit]
+Description=voice-postgres (xAI Speech to Speech + Harbor & Bean)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=DEPLOY_USER
+Group=DEPLOY_USER
+WorkingDirectory=/opt/voice-postgres
+EnvironmentFile=/opt/voice-postgres/.env
+# Postgres is Docker with restart: unless-stopped; bring it up if the box rebooted.
+ExecStartPre=/usr/bin/docker compose -f /opt/voice-postgres/docker-compose.yml up -d
+ExecStart=/opt/voice-postgres/.venv/bin/python -m voice_postgres
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+
+# Logs: journalctl -u voice-postgres -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+# Replace voice.example.com with your DNS name.
+# Caddy gets a Let's Encrypt cert automatically (ports 80 and 443 must be open).
+
+voice.example.com {
+	reverse_proxy 127.0.0.1:8765
+}

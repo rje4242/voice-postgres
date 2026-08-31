@@ -190,6 +190,14 @@ Defined in `voice_postgres/tools.py` and attached on `session.update`:
 
 `query_database` is guarded in `sql_guard.py`: comments stripped, single statement, SELECT/WITH only, no `INTO`, no `FOR UPDATE`, no mutating keywords.
 
+## Deploy (VPS + systemd)
+
+Keep Postgres in Docker, run FastAPI as a systemd service, put **Caddy** in front for HTTPS so the microphone works off localhost. Recipe and unit file: [`deploy/README.md`](deploy/README.md).
+
+```bash
+sudo ./deploy/install.sh
+```
+
 ## History logs
 
 Talk sessions and companion SQL append JSONL under `history/` (gitignored).
