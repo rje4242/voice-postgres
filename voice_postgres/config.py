@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://voice:voice@127.0.0.1:55432/voice_postgres"
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8765
 
     audio_sample_rate: int = 24000

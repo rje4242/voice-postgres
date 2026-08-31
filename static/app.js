@@ -81,6 +81,7 @@ const els = {
   askForm: document.getElementById("ask-form"),
   askInput: document.getElementById("ask-input"),
   askSend: document.getElementById("ask-send"),
+  originStatus: document.getElementById("origin-status"),
   voiceSelect: document.getElementById("voice-select"),
   speedSlider: document.getElementById("speed-slider"),
   speedValue: document.getElementById("speed-value"),
@@ -248,17 +249,32 @@ function escapeHtml(value) {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
+function isLoopbackHost() {
+  const host = location.hostname;
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+}
+
 function micSupported() {
   return Boolean(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function");
 }
 
+function warnOrigin() {
+  if (!els.originStatus) return;
+  const label = location.host || location.origin;
+  els.originStatus.textContent = label;
+  const ok = window.isSecureContext && micSupported();
+  els.originStatus.className = ok ? "ok" : "bad";
+  if (!ok && !live.ws) {
+    setCaption(micHelp());
+  }
+}
+
 function micHelp() {
-  const host = location.hostname;
-  const loopback = host === "localhost" || host === "127.0.0.1" || host === "[::1]";
-  if (location.protocol !== "https:" && !loopback) {
+  if (location.protocol !== "https:" && !isLoopbackHost()) {
     return (
-      `Microphone API is off on ${location.origin}. Browsers only expose getUserMedia ` +
-      `on localhost or HTTPS. Open http://127.0.0.1:8765 — not http://0.0.0.0:8765 and not a LAN hostname.`
+      `Microphone API is off on ${location.origin}. Restart did not break the mic — this URL is not a ` +
+      `secure context. Open http://127.0.0.1:${location.port || "8765"} in the address bar ` +
+      `(Uvicorn's http://0.0.0.0:... will not allow getUserMedia).`
     );
   }
   return "Microphone API is unavailable in this browser/webview. You can still type questions after Talk connects.";
@@ -575,6 +591,7 @@ els.speedSlider.addEventListener("change", () => {
   sendSpeed(els.speedSlider.value);
 });
 
+warnOrigin();
 loadHealth();
 loadVoices().catch((err) => setCaption(err.message));
 setSpeedUI(localStorage.getItem(SPEED_KEY) || 1);

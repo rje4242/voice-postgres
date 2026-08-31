@@ -26,6 +26,7 @@ async def lifespan(_app: FastAPI):
     await init_pool()
     await apply_schema()
     log.info("Schema ready. Voice model=%s voice=%s", settings.xai_voice_model, settings.xai_voice)
+    log.info("Open the Talk UI at http://127.0.0.1:%s  (not http://0.0.0.0 — the mic will not work there)", settings.port)
     if not settings.xai_api_key:
         log.warning("XAI_API_KEY is not set — the talk button will not connect to xAI.")
     yield
