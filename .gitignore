@@ -17,3 +17,5 @@ build/
 .vscode/
 history/*.jsonl
 history/sessions/
+.pg/
+pgdata/

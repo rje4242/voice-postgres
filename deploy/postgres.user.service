@@ -1,0 +1,13 @@
+[Unit]
+Description=voice-postgres PostgreSQL 16 (user-space)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/voice-postgres/.pg/bin/postgres -D %h/voice-postgres/pgdata
+ExecStop=%h/voice-postgres/.pg/bin/pg_ctl -D %h/voice-postgres/pgdata stop -m fast
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=voice-postgres FastAPI (user service)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/voice-postgres
+EnvironmentFile=%h/voice-postgres/.env
+ExecStart=%h/voice-postgres/.venv/bin/python -m voice_postgres
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
