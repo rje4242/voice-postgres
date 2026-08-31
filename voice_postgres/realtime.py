@@ -12,6 +12,7 @@ from websockets.asyncio.client import connect as xai_connect
 from websockets.exceptions import ConnectionClosed
 
 from voice_postgres.config import settings
+from voice_postgres.history import new_session, parse_user_text, record
 from voice_postgres.prompt import INSTRUCTIONS
 from voice_postgres.tools import TOOL_SCHEMAS, dispatch
 from voice_postgres.voices import clamp_speed, resolve_voice
@@ -88,6 +89,9 @@ class VoiceBridge:
         self._pending: dict[str, bool] = {}
         self._response_done = False
         self._xai = None
+        self._session_id = new_session("voice")
+        self._assistant_text = ""
+        self._last_user = ""
 
     async def _send_client(self, payload: dict[str, Any]) -> None:
         await self.client.send_json(payload)
@@ -147,6 +151,35 @@ class VoiceBridge:
         self._pending[call_id] = True
         await self._maybe_continue()
 
+    def _log_user(self, text: str, via: str) -> None:
+        text = (text or "").strip()
+        if not text or text == self._last_user:
+            return
+        self._last_user = text
+        record("voice.user", via=via, text=text)
+
+    def _log_xai_transcripts(self, event: dict[str, Any]) -> None:
+        etype = event.get("type") or ""
+        parsed = parse_user_text(event)
+        if parsed:
+            self._log_user(*parsed)
+        if etype in {
+            "response.output_audio_transcript.delta",
+            "response.audio_transcript.delta",
+        }:
+            self._assistant_text += event.get("delta") or ""
+        elif etype in {
+            "response.output_audio_transcript.done",
+            "response.audio_transcript.done",
+        }:
+            text = (event.get("transcript") or self._assistant_text or "").strip()
+            if text:
+                record("voice.assistant", text=text)
+            self._assistant_text = ""
+        elif etype == "response.done" and self._assistant_text.strip():
+            record("voice.assistant", text=self._assistant_text.strip())
+            self._assistant_text = ""
+
     async def _on_xai_message(self, raw: str | bytes) -> None:
         if isinstance(raw, bytes):
             return
@@ -157,10 +190,12 @@ class VoiceBridge:
             return
 
         etype = event.get("type")
+        self._log_xai_transcripts(event)
         if etype == "response.function_call_arguments.done":
             await self._handle_tool(event)
         elif etype == "response.created":
             self._response_done = False
+            self._assistant_text = ""
         elif etype == "response.done":
             self._response_done = True
             await self._maybe_continue()
@@ -189,11 +224,19 @@ class VoiceBridge:
         url = f"{settings.xai_realtime_url}?model={settings.xai_voice_model}"
         headers = {"Authorization": f"Bearer {settings.xai_api_key}"}
         log.info(
-            "Connecting to %s (pcm %s Hz, voice=%s, speed=%s)",
+            "Connecting to %s (pcm %s Hz, voice=%s, speed=%s, session=%s)",
             url,
             sample_rate,
             voice,
             speed,
+            self._session_id,
+        )
+        record(
+            "session.start",
+            model=settings.xai_voice_model,
+            voice=voice,
+            speed=speed,
+            sample_rate=sample_rate,
         )
 
         async with xai_connect(url, additional_headers=headers, open_timeout=20) as xai_ws:
@@ -221,6 +264,7 @@ class VoiceBridge:
                             continue
                         if event.get("type") == "local.set_voice":
                             new_voice = resolve_voice(event.get("voice"))
+                            record("voice", voice=new_voice)
                             await self._send_xai(
                                 {"type": "session.update", "session": {"voice": new_voice}}
                             )
@@ -233,6 +277,7 @@ class VoiceBridge:
                             continue
                         if event.get("type") == "local.set_speed":
                             new_speed = clamp_speed(event.get("speed"))
+                            record("speed", speed=new_speed)
                             await self._send_xai(
                                 {
                                     "type": "session.update",
@@ -246,6 +291,9 @@ class VoiceBridge:
                                 }
                             )
                             continue
+                        parsed = parse_user_text(event)
+                        if parsed:
+                            self._log_user(*parsed)
                         await xai_ws.send(text)
                 except WebSocketDisconnect:
                     return
@@ -271,4 +319,5 @@ class VoiceBridge:
                     if exc:
                         raise exc
             finally:
+                record("session.end")
                 self._xai = None

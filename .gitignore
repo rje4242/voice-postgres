@@ -15,3 +15,5 @@ build/
 *.log
 .idea/
 .vscode/
+history/*.jsonl
+history/sessions/

@@ -21,6 +21,7 @@ The API key never leaves the server. Custom tools are executed next to the datab
 - Write tools for tickets, customers, and inventory
 - A small web UI: schema browser, live transcript, tool-call inspector
 - A companion SQL console (`scripts/db_console.py`) for talking to the same Postgres directly
+- JSONL history of voice turns, SQL, and tool calls under `history/`
 
 The seed shop is **Harbor & Bean**, a neighborhood cafe: customers, products, tickets, staff, and shifts.
 
@@ -188,6 +189,21 @@ Defined in `voice_postgres/tools.py` and attached on `session.update`:
 | `adjust_inventory` | Signed stock change + audit row |
 
 `query_database` is guarded in `sql_guard.py`: comments stripped, single statement, SELECT/WITH only, no `INTO`, no `FOR UPDATE`, no mutating keywords.
+
+## History logs
+
+Talk sessions and companion SQL append JSONL under `history/` (gitignored).
+
+| File | What |
+|---|---|
+| `history/YYYY-MM-DD.jsonl` | All events that UTC day |
+| `history/sessions/<id>.jsonl` | One Voice Agent or `db_console` session |
+
+Events include spoken and typed user turns (`voice.user`), agent transcripts (`voice.assistant`), every tool call (`tool`), and SQL (`sql`, from the agent or the console).
+
+```bash
+tail -f history/$(date -u +%F).jsonl
+```
 
 ## Configuration
 

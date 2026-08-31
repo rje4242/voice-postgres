@@ -8,6 +8,7 @@ from uuid import UUID
 
 from voice_postgres.config import settings
 from voice_postgres.db import connection, fetch_all, fetch_one
+from voice_postgres.history import record
 from voice_postgres.sql_guard import sanitize_select
 
 log = logging.getLogger(__name__)
@@ -236,13 +237,15 @@ async def query_database(sql: str) -> dict[str, Any]:
             rows = await cur.fetchall()
             columns = [desc.name for desc in cur.description] if cur.description else []
         await conn.commit()
-    return {
+    result = {
         "sql": cleaned,
         "columns": columns,
         "row_count": len(rows),
         "truncated_to": settings.query_row_limit,
         "rows": jsonable(rows),
     }
+    record("sql", source="tool", sql=cleaned, row_count=len(rows), columns=columns)
+    return result
 
 
 async def create_customer(
@@ -461,13 +464,21 @@ HANDLERS = {
 async def dispatch(name: str, arguments: dict[str, Any]) -> str:
     handler = HANDLERS.get(name)
     if handler is None:
-        return dump({"error": f"Unknown tool {name!r}."})
+        output = dump({"error": f"Unknown tool {name!r}."})
+        record("tool", name=name, arguments=arguments, output=output, error=True)
+        return output
     try:
         result = await handler(**arguments)
-        return dump(result)
+        output = dump(result)
+        record("tool", name=name, arguments=arguments, output=jsonable(result))
+        return output
     except TypeError as exc:
         log.exception("Bad arguments for %s: %s", name, arguments)
-        return dump({"error": f"Bad arguments: {exc}"})
+        output = dump({"error": f"Bad arguments: {exc}"})
+        record("tool", name=name, arguments=arguments, output=output, error=True)
+        return output
     except Exception as exc:  # noqa: BLE001 — return to the model, keep the session alive
         log.exception("Tool %s failed", name)
-        return dump({"error": str(exc)})
+        output = dump({"error": str(exc)})
+        record("tool", name=name, arguments=arguments, output=output, error=True)
+        return output

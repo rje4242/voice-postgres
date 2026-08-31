@@ -21,6 +21,7 @@ from psycopg.rows import dict_row
 
 from voice_postgres.config import settings
 from voice_postgres.db import quote_ident
+from voice_postgres.history import new_session, record
 
 HISTORY_PATH = Path.home() / ".voice_postgres_history"
 PREVIEW_LIMIT = 20
@@ -117,10 +118,14 @@ def run_sql(conn: Connection, sql: str) -> str:
         cur.execute(sql)
         if cur.description is None:
             status = cur.statusmessage or "OK"
-            if cur.rowcount is not None and cur.rowcount >= 0:
-                return f"{status}  ({cur.rowcount} row{'s' if cur.rowcount != 1 else ''} affected)"
+            n = cur.rowcount if cur.rowcount is not None else -1
+            record("sql", source="console", sql=sql, row_count=n, status=status)
+            if n >= 0:
+                return f"{status}  ({n} row{'s' if n != 1 else ''} affected)"
             return status
         rows = list(cur.fetchall())
+        cols = [d.name for d in cur.description] if cur.description else []
+        record("sql", source="console", sql=sql, row_count=len(rows), columns=cols)
         return format_table(rows)
 
 
@@ -318,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     with conn:
+        new_session("console")
+        record("session.start", source="console")
         try:
             if args.command:
                 print(run_sql(conn, args.command))
@@ -338,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError, ProgrammingError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 1
+        finally:
+            record("session.end", source="console")
 
 
 if __name__ == "__main__":
