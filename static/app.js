@@ -248,7 +248,35 @@ function escapeHtml(value) {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
+function micSupported() {
+  return Boolean(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function");
+}
+
+function micHelp() {
+  const host = location.hostname;
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  if (location.protocol !== "https:" && !loopback) {
+    return (
+      `Microphone API is off on ${location.origin}. Browsers only expose getUserMedia ` +
+      `on localhost or HTTPS. Open http://127.0.0.1:8765 — not http://0.0.0.0:8765 and not a LAN hostname.`
+    );
+  }
+  return "Microphone API is unavailable in this browser/webview. You can still type questions after Talk connects.";
+}
+
+async function ensurePlayback() {
+  if (!live.ctx) {
+    live.ctx = new AudioContext({ sampleRate: 24000 });
+    live.player = new AudioPlayer(live.ctx);
+  }
+  if (live.ctx.state === "suspended") await live.ctx.resume();
+  return live.ctx.sampleRate;
+}
+
 async function startMic() {
+  if (!micSupported()) {
+    throw new Error(micHelp());
+  }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
@@ -257,10 +285,10 @@ async function startMic() {
       autoGainControl: true,
     },
   });
-  const ctx = new AudioContext({ sampleRate: 24000 });
-  const source = ctx.createMediaStreamSource(stream);
-  const processor = ctx.createScriptProcessor(4096, 1, 1);
-  const mute = ctx.createGain();
+  const sampleRate = await ensurePlayback();
+  const source = live.ctx.createMediaStreamSource(stream);
+  const processor = live.ctx.createScriptProcessor(4096, 1, 1);
+  const mute = live.ctx.createGain();
   mute.gain.value = 0;
   processor.onaudioprocess = (event) => {
     if (!live.capturing || !live.ws || live.ws.readyState !== WebSocket.OPEN) return;
@@ -278,13 +306,10 @@ async function startMic() {
   };
   source.connect(processor);
   processor.connect(mute);
-  mute.connect(ctx.destination);
-  live.ctx = ctx;
+  mute.connect(live.ctx.destination);
   live.stream = stream;
   live.processor = processor;
-  live.player = new AudioPlayer(ctx);
-  if (ctx.state === "suspended") await ctx.resume();
-  return ctx.sampleRate;
+  return sampleRate;
 }
 
 function stopMic() {
@@ -324,9 +349,16 @@ function handleEvent(event) {
   if (type === "local.ready") {
     if (event.voice) els.voiceSelect.value = event.voice;
     if (typeof event.speed === "number") setSpeedUI(event.speed);
-    setCaption(
-      `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice} at ${Number(event.speed ?? 1).toFixed(2)}×. Speak naturally — pause briefly when you are done. Or type below.`
-    );
+    const speed = Number(event.speed ?? 1).toFixed(2);
+    if (live.capturing) {
+      setCaption(
+        `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice} at ${speed}×. Speak, or type below.`
+      );
+    } else {
+      setCaption(
+        `Connected as ${event.voice} at ${speed}×, text only (no microphone). Type a question and press Ask.`
+      );
+    }
     setPhase("mic");
     setAskEnabled(true);
     els.askInput.focus();
@@ -387,7 +419,18 @@ async function startSession() {
   }
   els.transcript.innerHTML = "";
   els.tools.innerHTML = "";
-  const sampleRate = await startMic();
+  let micError = null;
+  let sampleRate = 24000;
+  try {
+    sampleRate = await startMic();
+    live.capturing = true;
+  } catch (err) {
+    micError = err instanceof Error ? err.message : String(err);
+    live.capturing = false;
+    await ensurePlayback();
+    sampleRate = live.ctx?.sampleRate || 24000;
+    setCaption(`${micError} Connecting for typed questions…`);
+  }
   const rate = SAMPLE_RATES.has(sampleRate) ? sampleRate : 24000;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
@@ -401,11 +444,12 @@ async function startSession() {
         speed: selectedSpeed(),
       })
     );
-    live.capturing = true;
     els.talkBtn.setAttribute("aria-pressed", "true");
-    els.orbCore.textContent = "Live";
+    els.orbCore.textContent = live.capturing ? "Live" : "Text";
     setPhase("mic");
-    setCaption("Opening the Voice Agent session… allow the mic if the browser asks.");
+    if (!micError) {
+      setCaption("Opening the Voice Agent session… allow the mic if the browser asks.");
+    }
   };
   ws.onmessage = (msg) => {
     let event;
