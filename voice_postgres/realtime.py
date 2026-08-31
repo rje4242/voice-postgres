@@ -14,6 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from voice_postgres.config import settings
 from voice_postgres.prompt import INSTRUCTIONS
 from voice_postgres.tools import TOOL_SCHEMAS, dispatch
+from voice_postgres.voices import resolve_voice
 
 log = logging.getLogger(__name__)
 
@@ -23,11 +24,11 @@ GREETING = (
 )
 
 
-def session_update_event(sample_rate: int) -> dict[str, Any]:
+def session_update_event(sample_rate: int, voice: str | None = None) -> dict[str, Any]:
     return {
         "type": "session.update",
         "session": {
-            "voice": settings.xai_voice,
+            "voice": resolve_voice(voice),
             "instructions": INSTRUCTIONS,
             "turn_detection": {
                 "type": "server_vad",
@@ -166,6 +167,7 @@ class VoiceBridge:
         sample_rate = int(start.get("sample_rate") or settings.audio_sample_rate)
         if sample_rate not in {8000, 16000, 22050, 24000, 32000, 44100, 48000}:
             sample_rate = settings.audio_sample_rate
+        voice = resolve_voice(start.get("voice"))
 
         if not settings.xai_api_key:
             await self._send_client(
@@ -180,16 +182,16 @@ class VoiceBridge:
 
         url = f"{settings.xai_realtime_url}?model={settings.xai_voice_model}"
         headers = {"Authorization": f"Bearer {settings.xai_api_key}"}
-        log.info("Connecting to %s (pcm %s Hz)", url, sample_rate)
+        log.info("Connecting to %s (pcm %s Hz, voice=%s)", url, sample_rate, voice)
 
         async with xai_connect(url, additional_headers=headers, open_timeout=20) as xai_ws:
             self._xai = xai_ws
-            await self._send_xai(session_update_event(sample_rate))
+            await self._send_xai(session_update_event(sample_rate, voice))
             await self._send_xai(force_greeting())
             await self._send_client(
                 {
                     "type": "local.ready",
-                    "voice": settings.xai_voice,
+                    "voice": voice,
                     "model": settings.xai_voice_model,
                     "sample_rate": sample_rate,
                 }
@@ -199,6 +201,23 @@ class VoiceBridge:
                 try:
                     while True:
                         text = await self.client.receive_text()
+                        try:
+                            event = json.loads(text)
+                        except json.JSONDecodeError:
+                            await xai_ws.send(text)
+                            continue
+                        if event.get("type") == "local.set_voice":
+                            new_voice = resolve_voice(event.get("voice"))
+                            await self._send_xai(
+                                {"type": "session.update", "session": {"voice": new_voice}}
+                            )
+                            await self._send_client(
+                                {
+                                    "type": "local.voice",
+                                    "voice": new_voice,
+                                }
+                            )
+                            continue
                         await xai_ws.send(text)
                 except WebSocketDisconnect:
                     return

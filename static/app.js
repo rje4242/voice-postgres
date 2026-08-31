@@ -81,7 +81,10 @@ const els = {
   askForm: document.getElementById("ask-form"),
   askInput: document.getElementById("ask-input"),
   askSend: document.getElementById("ask-send"),
+  voiceSelect: document.getElementById("voice-select"),
 };
+
+const VOICE_KEY = "voice-postgres.voice";
 
 let live = {
   ws: null,
@@ -180,7 +183,7 @@ async function loadHealth() {
     els.dbStatus.className = data.ok ? "ok" : "bad";
     els.keyStatus.textContent = data.has_api_key ? "present" : "missing";
     els.keyStatus.className = data.has_api_key ? "ok" : "bad";
-    els.voiceStatus.textContent = `${data.voice} · ${data.model}`;
+    els.voiceStatus.textContent = data.model;
     if (!data.has_api_key) {
       setCaption("Add XAI_API_KEY to .env, then restart. Postgres can still be browsed on the left.");
     }
@@ -303,7 +306,13 @@ function handleEvent(event) {
     setPhase("idle");
     return;
   }
+  if (type === "local.voice") {
+    if (event.voice) els.voiceSelect.value = event.voice;
+    setCaption(`Voice set to ${event.voice}. Next reply uses this voice.`);
+    return;
+  }
   if (type === "local.ready") {
+    if (event.voice) els.voiceSelect.value = event.voice;
     setCaption(
       `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice}. Speak naturally — pause briefly when you are done. Or type below.`
     );
@@ -373,7 +382,13 @@ async function startSession() {
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   live.ws = ws;
   ws.onopen = () => {
-    ws.send(JSON.stringify({ type: "local.start", sample_rate: rate }));
+    ws.send(
+      JSON.stringify({
+        type: "local.start",
+        sample_rate: rate,
+        voice: selectedVoice(),
+      })
+    );
     live.capturing = true;
     els.talkBtn.setAttribute("aria-pressed", "true");
     els.orbCore.textContent = "Live";
@@ -430,5 +445,48 @@ document.getElementById("refresh-schema").addEventListener("click", () => {
   loadSchema().catch((err) => setCaption(err.message));
 });
 
+function selectedVoice() {
+  return els.voiceSelect.value || localStorage.getItem(VOICE_KEY) || "eve";
+}
+
+async function loadVoices() {
+  const res = await fetch("/api/voices");
+  const data = await res.json();
+  const groups = { original: "Original", flagship: "Flagship", custom: "Custom" };
+  const buckets = new Map();
+  for (const voice of data.voices || []) {
+    const key = voice.group || "flagship";
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(voice);
+  }
+  els.voiceSelect.innerHTML = "";
+  for (const [key, label] of Object.entries(groups)) {
+    const items = buckets.get(key);
+    if (!items || !items.length) continue;
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = label;
+    for (const voice of items) {
+      const opt = document.createElement("option");
+      opt.value = voice.id;
+      opt.textContent = voice.description ? `${voice.name} — ${voice.description}` : voice.name;
+      optgroup.appendChild(opt);
+    }
+    els.voiceSelect.appendChild(optgroup);
+  }
+  const preferred = localStorage.getItem(VOICE_KEY) || data.default || "eve";
+  if ([...els.voiceSelect.options].some((o) => o.value === preferred)) {
+    els.voiceSelect.value = preferred;
+  }
+}
+
+els.voiceSelect.addEventListener("change", () => {
+  const voice = els.voiceSelect.value;
+  localStorage.setItem(VOICE_KEY, voice);
+  if (live.ws && live.ws.readyState === WebSocket.OPEN) {
+    live.ws.send(JSON.stringify({ type: "local.set_voice", voice }));
+  }
+});
+
 loadHealth();
+loadVoices().catch((err) => setCaption(err.message));
 loadSchema().catch((err) => setCaption(err.message));

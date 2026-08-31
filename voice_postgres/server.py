@@ -11,6 +11,7 @@ from voice_postgres.config import STATIC_DIR, settings
 from voice_postgres.db import apply_schema, close_pool, health as db_health, init_pool, quote_ident
 from voice_postgres.realtime import VoiceBridge
 from voice_postgres.tools import inspect_schema, query_database
+from voice_postgres.voices import list_voices
 
 log = logging.getLogger("voice_postgres")
 
@@ -45,6 +46,11 @@ async def health():
         "has_api_key": bool(settings.xai_api_key),
         "sample_rate": settings.audio_sample_rate,
     }
+
+
+@app.get("/api/voices")
+async def voices():
+    return list_voices()
 
 
 @app.get("/api/schema")

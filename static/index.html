@@ -25,7 +25,7 @@
         <dl class="status" id="status">
           <div><dt>Postgres</dt><dd id="db-status">checking</dd></div>
           <div><dt>xAI key</dt><dd id="key-status">checking</dd></div>
-          <div><dt>Voice</dt><dd id="voice-status">—</dd></div>
+          <div><dt>Model</dt><dd id="voice-status">—</dd></div>
         </dl>
       </header>
 
@@ -51,6 +51,10 @@
             <li data-phase="tool">Postgres</li>
             <li data-phase="speak">Agent speaking</li>
           </ol>
+          <label class="voice-picker">
+            <span>Voice</span>
+            <select id="voice-select" aria-label="Agent voice"></select>
+          </label>
           <button type="button" class="orb" id="talk-btn" aria-pressed="false">
             <span class="orb-ring"></span>
             <span class="orb-core" id="orb-core">Talk</span>
