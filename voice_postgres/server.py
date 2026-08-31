@@ -98,7 +98,10 @@ async def websocket_voice(ws: WebSocket):
 
 @app.get("/")
 async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
