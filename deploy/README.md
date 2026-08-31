@@ -39,6 +39,9 @@ XAI_API_KEY=xai-...
 HOST=127.0.0.1
 PORT=8765
 DATABASE_URL=postgresql://voice:voice@127.0.0.1:55432/voice_postgres
+# Path prefix + absolute URL so Discord/Slack unfurls show a title, blurb, and image
+PUBLIC_BASE=/assistant
+PUBLIC_URL=https://agenticedge.us/assistant
 ```
 
 ```bash

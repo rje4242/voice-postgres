@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from voice_postgres.config import STATIC_DIR, public_base_path, settings
+from voice_postgres.config import STATIC_DIR, canonical_url, og_image_url, public_base_path, settings
 from voice_postgres.db import apply_schema, close_pool, health as db_health, init_pool, quote_ident
 from voice_postgres.realtime import VoiceBridge
 from voice_postgres.tools import inspect_schema, query_database
@@ -101,10 +101,14 @@ async def websocket_voice(ws: WebSocket):
             pass
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def index():
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    html = html.replace("__PUBLIC_BASE__", public_base_path())
+    html = (
+        html.replace("__PUBLIC_BASE__", public_base_path())
+        .replace("__PUBLIC_URL__", canonical_url())
+        .replace("__OG_IMAGE__", og_image_url())
+    )
     return HTMLResponse(html, headers={"Cache-Control": "no-store, max-age=0"})
 
 

@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     port: int = 8765
     # Public URL prefix when reverse-proxied, e.g. /assistant
     public_base: str = ""
+    # Absolute page URL for Open Graph (Discord embeds), e.g. https://agenticedge.us/assistant
+    public_url: str = ""
 
     audio_sample_rate: int = 24000
     query_row_limit: int = 50
@@ -48,3 +50,14 @@ def public_base_path() -> str:
     if not raw or raw == "/":
         return "/"
     return "/" + raw.strip("/") + "/"
+
+
+def canonical_url() -> str:
+    raw = (settings.public_url or "").strip().rstrip("/")
+    if raw:
+        return raw + "/"
+    return f"http://127.0.0.1:{settings.port}{public_base_path()}"
+
+
+def og_image_url() -> str:
+    return canonical_url() + "static/og.png"
