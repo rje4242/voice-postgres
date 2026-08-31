@@ -50,6 +50,19 @@ BUILTIN_BY_ID = {v["id"]: v for v in BUILTIN}
 _CUSTOM_ID = re.compile(r"^[a-z0-9]{8}$")
 
 
+SPEED_MIN = 0.7
+SPEED_MAX = 1.5
+SPEED_DEFAULT = 1.0
+
+
+def clamp_speed(value: object, default: float = SPEED_DEFAULT) -> float:
+    try:
+        speed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return max(SPEED_MIN, min(SPEED_MAX, round(speed, 2)))
+
+
 def resolve_voice(name: str | None) -> str:
     raw = (name or settings.xai_voice or "eve").strip().lower()
     if raw in BUILTIN_BY_ID or _CUSTOM_ID.fullmatch(raw):

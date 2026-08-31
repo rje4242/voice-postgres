@@ -82,9 +82,14 @@ const els = {
   askInput: document.getElementById("ask-input"),
   askSend: document.getElementById("ask-send"),
   voiceSelect: document.getElementById("voice-select"),
+  speedSlider: document.getElementById("speed-slider"),
+  speedValue: document.getElementById("speed-value"),
 };
 
 const VOICE_KEY = "voice-postgres.voice";
+const SPEED_KEY = "voice-postgres.speed";
+const SPEED_MIN = 0.7;
+const SPEED_MAX = 1.5;
 
 let live = {
   ws: null,
@@ -311,10 +316,16 @@ function handleEvent(event) {
     setCaption(`Voice set to ${event.voice}. Next reply uses this voice.`);
     return;
   }
+  if (type === "local.speed") {
+    if (typeof event.speed === "number") setSpeedUI(event.speed);
+    setCaption(`Speed set to ${Number(event.speed).toFixed(2)}×. Next reply uses this rate.`);
+    return;
+  }
   if (type === "local.ready") {
     if (event.voice) els.voiceSelect.value = event.voice;
+    if (typeof event.speed === "number") setSpeedUI(event.speed);
     setCaption(
-      `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice}. Speak naturally — pause briefly when you are done. Or type below.`
+      `Mic is streaming ${event.sample_rate} Hz PCM to ${event.voice} at ${Number(event.speed ?? 1).toFixed(2)}×. Speak naturally — pause briefly when you are done. Or type below.`
     );
     setPhase("mic");
     setAskEnabled(true);
@@ -387,6 +398,7 @@ async function startSession() {
         type: "local.start",
         sample_rate: rate,
         voice: selectedVoice(),
+        speed: selectedSpeed(),
       })
     );
     live.capturing = true;
@@ -449,6 +461,31 @@ function selectedVoice() {
   return els.voiceSelect.value || localStorage.getItem(VOICE_KEY) || "eve";
 }
 
+function clampSpeed(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(n * 20) / 20));
+}
+
+function selectedSpeed() {
+  return clampSpeed(els.speedSlider.value || localStorage.getItem(SPEED_KEY) || 1);
+}
+
+function setSpeedUI(value) {
+  const speed = clampSpeed(value);
+  els.speedSlider.value = String(speed);
+  els.speedValue.textContent = `${speed.toFixed(2)}×`;
+  localStorage.setItem(SPEED_KEY, String(speed));
+}
+
+function sendSpeed(value) {
+  const speed = clampSpeed(value);
+  setSpeedUI(speed);
+  if (live.ws && live.ws.readyState === WebSocket.OPEN) {
+    live.ws.send(JSON.stringify({ type: "local.set_speed", speed }));
+  }
+}
+
 async function loadVoices() {
   const res = await fetch("/api/voices");
   const data = await res.json();
@@ -487,6 +524,14 @@ els.voiceSelect.addEventListener("change", () => {
   }
 });
 
+els.speedSlider.addEventListener("input", () => {
+  setSpeedUI(els.speedSlider.value);
+});
+els.speedSlider.addEventListener("change", () => {
+  sendSpeed(els.speedSlider.value);
+});
+
 loadHealth();
 loadVoices().catch((err) => setCaption(err.message));
+setSpeedUI(localStorage.getItem(SPEED_KEY) || 1);
 loadSchema().catch((err) => setCaption(err.message));

@@ -14,7 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from voice_postgres.config import settings
 from voice_postgres.prompt import INSTRUCTIONS
 from voice_postgres.tools import TOOL_SCHEMAS, dispatch
-from voice_postgres.voices import resolve_voice
+from voice_postgres.voices import clamp_speed, resolve_voice
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +24,11 @@ GREETING = (
 )
 
 
-def session_update_event(sample_rate: int, voice: str | None = None) -> dict[str, Any]:
+def session_update_event(
+    sample_rate: int,
+    voice: str | None = None,
+    speed: float | None = None,
+) -> dict[str, Any]:
     return {
         "type": "session.update",
         "session": {
@@ -57,7 +61,8 @@ def session_update_event(sample_rate: int, voice: str | None = None) -> dict[str
                     "format": {
                         "type": "audio/pcm",
                         "rate": sample_rate,
-                    }
+                    },
+                    "speed": clamp_speed(speed),
                 },
             },
             "tools": TOOL_SCHEMAS,
@@ -168,6 +173,7 @@ class VoiceBridge:
         if sample_rate not in {8000, 16000, 22050, 24000, 32000, 44100, 48000}:
             sample_rate = settings.audio_sample_rate
         voice = resolve_voice(start.get("voice"))
+        speed = clamp_speed(start.get("speed"))
 
         if not settings.xai_api_key:
             await self._send_client(
@@ -182,16 +188,23 @@ class VoiceBridge:
 
         url = f"{settings.xai_realtime_url}?model={settings.xai_voice_model}"
         headers = {"Authorization": f"Bearer {settings.xai_api_key}"}
-        log.info("Connecting to %s (pcm %s Hz, voice=%s)", url, sample_rate, voice)
+        log.info(
+            "Connecting to %s (pcm %s Hz, voice=%s, speed=%s)",
+            url,
+            sample_rate,
+            voice,
+            speed,
+        )
 
         async with xai_connect(url, additional_headers=headers, open_timeout=20) as xai_ws:
             self._xai = xai_ws
-            await self._send_xai(session_update_event(sample_rate, voice))
+            await self._send_xai(session_update_event(sample_rate, voice, speed))
             await self._send_xai(force_greeting())
             await self._send_client(
                 {
                     "type": "local.ready",
                     "voice": voice,
+                    "speed": speed,
                     "model": settings.xai_voice_model,
                     "sample_rate": sample_rate,
                 }
@@ -215,6 +228,21 @@ class VoiceBridge:
                                 {
                                     "type": "local.voice",
                                     "voice": new_voice,
+                                }
+                            )
+                            continue
+                        if event.get("type") == "local.set_speed":
+                            new_speed = clamp_speed(event.get("speed"))
+                            await self._send_xai(
+                                {
+                                    "type": "session.update",
+                                    "session": {"audio": {"output": {"speed": new_speed}}},
+                                }
+                            )
+                            await self._send_client(
+                                {
+                                    "type": "local.speed",
+                                    "speed": new_speed,
                                 }
                             )
                             continue

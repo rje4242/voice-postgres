@@ -199,6 +199,7 @@ See `.env.example`.
 | `XAI_REALTIME_URL` | `wss://api.x.ai/v1/realtime` |
 | `XAI_VOICE_MODEL` | `grok-voice-latest` |
 | `XAI_VOICE` | `eve` (UI dropdown can override per session) |
+| Speech speed | UI slider 0.7×–1.5× (`audio.output.speed`); default 1.0 |
 | `DATABASE_URL` | `postgresql://voice:voice@127.0.0.1:55432/voice_postgres` |
 | `PORT` | `8765` |
 
