@@ -74,15 +74,30 @@ sudo systemctl restart voice-postgres
 
 ## 4. HTTPS (Caddy)
 
+Do **not** replace `/etc/caddy/Caddyfile` if other sites already live there. Add a site block.
+
+**Option A — edit the existing file** (simplest if you only have a few sites):
+
+```caddy
+voice.example.com {
+	reverse_proxy 127.0.0.1:8765
+}
+```
+
+Then `sudo systemctl reload caddy`.
+
+**Option B — import a snippet** so each app has its own file:
+
 ```bash
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-# edit the hostname
-sudo nano /etc/caddy/Caddyfile
-sudo systemctl enable --now caddy
+# once, if the main Caddyfile does not already import extras:
+# add a line:  import /etc/caddy/sites/*
+sudo mkdir -p /etc/caddy/sites
+sudo cp /opt/voice-postgres/deploy/Caddyfile /etc/caddy/sites/voice-postgres.caddy
+sudo nano /etc/caddy/sites/voice-postgres.caddy   # set the hostname
 sudo systemctl reload caddy
 ```
 
-Open `https://voice.example.com`. Caddy proxies WebSockets for `/ws` with no extra config.
+Caddy proxies WebSockets for `/ws` with no extra config. Open `https://voice.example.com`.
 
 ## If you skip Caddy
 

@@ -1,5 +1,10 @@
-# Replace voice.example.com with your DNS name.
-# Caddy gets a Let's Encrypt cert automatically (ports 80 and 443 must be open).
+# Site block only — do not overwrite /etc/caddy/Caddyfile if you already have one.
+# Either paste this into the existing Caddyfile, or:
+#   echo 'import /etc/caddy/sites/*' >> /etc/caddy/Caddyfile
+#   sudo cp this file to /etc/caddy/sites/voice-postgres.caddy
+#
+# Replace the hostname. Caddy gets a Let's Encrypt cert (80 and 443 must be open).
+# reverse_proxy upgrades WebSockets for /ws with no extra config.
 
 voice.example.com {
 	reverse_proxy 127.0.0.1:8765
