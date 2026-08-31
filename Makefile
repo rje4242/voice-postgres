@@ -17,3 +17,6 @@ env:
 
 test:
 	python -m pytest -q
+
+pdf:
+	python scripts/make_db_guide.py

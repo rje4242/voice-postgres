@@ -112,6 +112,8 @@ python -m voice_postgres
 
 Writes always ask for confirmation first (that rule is in the voice prompt).
 
+A printable schema guide is [docs/harbor-and-bean-database.pdf](docs/harbor-and-bean-database.pdf). Regenerate with `python scripts/make_db_guide.py` (reportlab).
+
 ## Database
 
 | Relation | Kind | Point of it |
