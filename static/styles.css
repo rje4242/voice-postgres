@@ -40,9 +40,9 @@ body {
 }
 .brand { display: flex; gap: 0.9rem; align-items: center; }
 .mark {
-  width: 2.4rem; height: 2.4rem; border-radius: 50%;
-  background: conic-gradient(from 200deg, var(--copper), #e8c39a, var(--sage), var(--copper));
-  box-shadow: 0 0 0 3px #1c1410, 0 0 0 4px #6d4a32;
+  width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  display: block;
+  box-shadow: 0 0 0 2px #1c1410, 0 0 0 3px #6d4a32;
 }
 h1 { font-size: 1.35rem; margin: 0; letter-spacing: 0.01em; font-weight: 600; }
 .brand p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.92rem; }
