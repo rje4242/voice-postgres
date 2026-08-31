@@ -1,5 +1,20 @@
 const SAMPLE_RATES = new Set([8000, 16000, 22050, 24000, 32000, 44100, 48000]);
 
+function appBase() {
+  const el = document.querySelector("base");
+  if (!el) return "/";
+  try {
+    const path = new URL(el.href, location.origin).pathname;
+    return path.endsWith("/") ? path : `${path}/`;
+  } catch {
+    return "/";
+  }
+}
+
+function apiUrl(path) {
+  return `${appBase()}${String(path).replace(/^\//, "")}`;
+}
+
 function floatToBase64PCM16(float32) {
   const pcm16 = new Int16Array(float32.length);
   for (let i = 0; i < float32.length; i++) {
@@ -183,7 +198,7 @@ function addTool(event) {
 
 async function loadHealth() {
   try {
-    const res = await fetch("/api/health");
+    const res = await fetch(apiUrl("api/health"));
     const data = await res.json();
     els.dbStatus.textContent = data.ok ? "up" : "down";
     els.dbStatus.className = data.ok ? "ok" : "bad";
@@ -202,7 +217,7 @@ async function loadHealth() {
 }
 
 async function loadSchema() {
-  const res = await fetch("/api/schema");
+  const res = await fetch(apiUrl("api/schema"));
   const data = await res.json();
   els.schemaList.innerHTML = "";
   for (const rel of data.relations || []) {
@@ -219,7 +234,7 @@ async function loadSchema() {
 async function previewTable(name, li) {
   for (const item of els.schemaList.querySelectorAll("li")) item.classList.remove("active");
   li.classList.add("active");
-  const res = await fetch(`/api/preview/${encodeURIComponent(name)}`);
+  const res = await fetch(apiUrl(`api/preview/${encodeURIComponent(name)}`));
   const data = await res.json();
   els.preview.hidden = false;
   els.previewTitle.textContent = name;
@@ -449,7 +464,7 @@ async function startSession() {
   }
   const rate = SAMPLE_RATES.has(sampleRate) ? sampleRate : 24000;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const ws = new WebSocket(`${proto}://${location.host}${appBase()}ws`);
   live.ws = ws;
   ws.onopen = () => {
     ws.send(
@@ -547,7 +562,7 @@ function sendSpeed(value) {
 }
 
 async function loadVoices() {
-  const res = await fetch("/api/voices");
+  const res = await fetch(apiUrl("api/voices"));
   const data = await res.json();
   const groups = { original: "Original", flagship: "Flagship", custom: "Custom" };
   const buckets = new Map();

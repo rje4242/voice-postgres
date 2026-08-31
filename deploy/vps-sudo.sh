@@ -1,32 +1,41 @@
 #!/usr/bin/env bash
-# One-time root steps on agenticedge. Run: sudo ./deploy/vps-sudo.sh
+# Add /assistant/ to the existing agenticedge.us nginx site. Does not replace it.
+# Run: sudo ./deploy/vps-sudo.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SITE=assistant.agenticedge.us
-AVAIL=/etc/nginx/sites-available/$SITE
-ENABLED=/etc/nginx/sites-enabled/$SITE
+SNIPPET_SRC="$ROOT/deploy/nginx-assistant-path.conf"
+SNIPPET_DST=/etc/nginx/snippets/voice-postgres.conf
+SITE=/etc/nginx/sites-available/agenticedge.us
 
-install -m 644 "$ROOT/deploy/nginx-assistant.agenticedge.us.conf" "$AVAIL"
-ln -sfn "$AVAIL" "$ENABLED"
+install -m 644 "$SNIPPET_SRC" "$SNIPPET_DST"
 
-nginx -t
-systemctl reload nginx
+if [[ ! -f "$SITE" ]]; then
+  echo "Expected $SITE (existing blog site). Aborting."
+  exit 1
+fi
 
-if command -v certbot >/dev/null; then
-  certbot --nginx -d "$SITE" --non-interactive --agree-tos --redirect \
-    --keep-until-expiring || certbot --nginx -d agenticedge.us -d www.agenticedge.us -d "$SITE" --expand --non-interactive --agree-tos
+if grep -q 'snippets/voice-postgres.conf' "$SITE"; then
+  echo "Include already present in $SITE"
+else
+  python3 - <<'PY'
+from pathlib import Path
+p = Path("/etc/nginx/sites-available/agenticedge.us")
+text = p.read_text()
+needle = "    client_max_body_size 10M;\n"
+insert = needle + "\n    include snippets/voice-postgres.conf;\n"
+if "snippets/voice-postgres.conf" in text:
+    raise SystemExit(0)
+if needle not in text:
+    raise SystemExit("Could not find insertion point (client_max_body_size) in nginx site")
+p.write_text(text.replace(needle, insert, 1))
+print("Inserted include snippets/voice-postgres.conf into", p)
+PY
 fi
 
 nginx -t
 systemctl reload nginx
-
-# Docker socket so the same user can `docker compose up -d` next time
-if getent group docker >/dev/null; then
-  usermod -aG docker "${SUDO_USER:-rob}"
-fi
-
 loginctl enable-linger "${SUDO_USER:-rob}" || true
-
-echo "Nginx site $SITE enabled. Open https://$SITE"
-echo "If you were added to docker, log out and back in."
+echo
+echo "https://agenticedge.us/assistant/  should now proxy to 127.0.0.1:8765"
+echo "Linger enabled so user systemd services survive logout."

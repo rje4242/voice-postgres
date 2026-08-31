@@ -32,6 +32,8 @@ class Settings(BaseSettings):
 
     host: str = "127.0.0.1"
     port: int = 8765
+    # Public URL prefix when reverse-proxied, e.g. /assistant
+    public_base: str = ""
 
     audio_sample_rate: int = 24000
     query_row_limit: int = 50
@@ -39,3 +41,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def public_base_path() -> str:
+    raw = (settings.public_base or "").strip()
+    if not raw or raw == "/":
+        return "/"
+    return "/" + raw.strip("/") + "/"

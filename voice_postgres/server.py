@@ -4,10 +4,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from voice_postgres.config import STATIC_DIR, settings
+from voice_postgres.config import STATIC_DIR, public_base_path, settings
 from voice_postgres.db import apply_schema, close_pool, health as db_health, init_pool, quote_ident
 from voice_postgres.realtime import VoiceBridge
 from voice_postgres.tools import inspect_schema, query_database
@@ -26,7 +26,11 @@ async def lifespan(_app: FastAPI):
     await init_pool()
     await apply_schema()
     log.info("Schema ready. Voice model=%s voice=%s", settings.xai_voice_model, settings.xai_voice)
-    log.info("Open the Talk UI at http://127.0.0.1:%s  (not http://0.0.0.0 — the mic will not work there)", settings.port)
+    log.info(
+        "Open the Talk UI at http://127.0.0.1:%s%s  (use HTTPS + this prefix in production)",
+        settings.port,
+        public_base_path(),
+    )
     if not settings.xai_api_key:
         log.warning("XAI_API_KEY is not set — the talk button will not connect to xAI.")
     yield
@@ -99,10 +103,9 @@ async def websocket_voice(ws: WebSocket):
 
 @app.get("/")
 async def index():
-    return FileResponse(
-        STATIC_DIR / "index.html",
-        headers={"Cache-Control": "no-store, max-age=0"},
-    )
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    html = html.replace("__PUBLIC_BASE__", public_base_path())
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, max-age=0"})
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

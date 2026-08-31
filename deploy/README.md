@@ -72,6 +72,16 @@ source .venv/bin/activate && pip install -e .
 sudo systemctl restart voice-postgres
 ```
 
+On **agenticedge.us** the reverse proxy is **nginx** (not Caddy). Add `/assistant/` to the existing TLS site so the current Let's Encrypt cert works and the blog is untouched:
+
+```bash
+ssh agenticedge
+cd ~/voice-postgres
+sudo ./deploy/vps-sudo.sh
+```
+
+That installs `snippets/voice-postgres.conf` and inserts one `include` into `/etc/nginx/sites-available/agenticedge.us`. Then open https://agenticedge.us/assistant/
+
 ## 4. HTTPS (Caddy)
 
 Do **not** replace `/etc/caddy/Caddyfile` if other sites already live there. Add a site block.
